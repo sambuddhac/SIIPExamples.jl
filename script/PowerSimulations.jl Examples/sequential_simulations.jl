@@ -6,8 +6,8 @@
 
 #' ## Introduction
 
-#' PowerSimulations.jl supports simulations that consist of sequential optimization problems 
-#' where results from previous problems inform subsequent problems in a variety of ways this 
+#' PowerSimulations.jl supports simulations that consist of sequential optimization problems
+#' where results from previous problems inform subsequent problems in a variety of ways this
 #' notebook demonstrates some of these capabilities to represent electricitty market clearing.
 
 #' ### Dependencies
@@ -36,7 +36,7 @@ const PSY = PowerSystems;
 sys_RT = System(rawsys; forecast_resolution = Dates.Minute(5))
 
 #' ### Define inittial times for simulatiton
-#' We can create a vector of initial times for a system by defining the step length and the 
+#' We can create a vector of initial times for a system by defining the step length and the
 #' horizon. For example, we can create a set of initial times that represent 12hr steps every
 #' 6hrs from the hourly `system`.
 DA_initial_times = PSY.generate_initial_times(sys, Dates.Hour(6), 12)
@@ -58,13 +58,13 @@ devices = Dict{Symbol, DeviceModel}(:Generators => DeviceModel(PSY.ThermalStanda
                                     :Ren => DeviceModel(PSY.RenewableDispatch, PSI.RenewableFullDispatch),
                                     :Loads =>  DeviceModel(PSY.PowerLoad, PSI.StaticPowerLoad),
                                     #:ILoads =>  DeviceModel(PSY.InterruptibleLoad, PSI.StaticPowerLoad),
-                                    )       
+                                    )
 
 
-model_ref_uc= ModelReference(CopperPlatePowerModel, devices, branches, services);
+template_uc= OperationsTemplate(CopperPlatePowerModel, devices, branches, services);
 
 
-#' ### Define the reference model for the economic dispatch 
+#' ### Define the reference model for the economic dispatch
 branches = Dict{Symbol, DeviceModel}(#:L => DeviceModel(PSY.Line, PSI.StaticLine),
                                      #:T => DeviceModel(PSY.Transformer2W, PSI.StaticTransformer),
                                      #:TT => DeviceModel(PSY.TapTransformer, PSI.StaticTransformer),
@@ -77,9 +77,9 @@ devices = Dict{Symbol, DeviceModel}(:Generators => DeviceModel(PSY.ThermalStanda
                                     :Ren => DeviceModel(PSY.RenewableDispatch, PSI.RenewableFullDispatch),
                                     :Loads =>  DeviceModel(PSY.PowerLoad, PSI.StaticPowerLoad),
                                     #:ILoads =>  DeviceModel(PSY.InterruptibleLoad, PSI.DispatchablePowerLoad),
-                                    )       
+                                    )
 
-model_ref_ed= ModelReference(CopperPlatePowerModel, devices, branches, services);
+template_ed= OperationsTemplate(CopperPlatePowerModel, devices, branches, services);
 
 #' ## Define the stages
 #' Stages define a model. The actual problem will change as the stage gets updated to represent
@@ -87,26 +87,26 @@ model_ref_ed= ModelReference(CopperPlatePowerModel, devices, branches, services)
 
 #' ### Day-Ahead UC stage
 #' The UC stage is defined with:
-#'  - formulation = `model_ref_uc`
+#'  - formulation = `template_uc`
 #'  - Run once per step
 #'  - `System` = `sys`
 #'  - Optimized with the 'Cbc_optimizer'
 #'  - feedforward - from self... grab last value of this stage to initialize next run
-DA_stage = Stage(model_ref_uc, 1, sys, Cbc_optimizer,  Dict(0 => Sequential()))
+DA_stage = Stage(template_uc, 1, sys, Cbc_optimizer,  Dict(0 => Sequential()))
 
 #' ### Real-Time ED stage
 #' The ED stage is defined with:
-#'  - formulation = `model_ref_ed`
+#'  - formulation = `template_ed`
 #'  - `System` = `sys_RT`
 #'  - Optimized with the 'Cbc_optimizer'
 #'  - Synchronized with ??
 #'  - Run 6x
-RT_stage = Stage(model_ref_ed, 
-                96, 
-                sys_RT, 
-                Cbc_optimizer, 
-                Dict(1 => Synchronize(24,4), 
-                     0 => Sequential()), 
+RT_stage = Stage(template_ed,
+                96,
+                sys_RT,
+                Cbc_optimizer,
+                Dict(1 => Synchronize(24,4),
+                     0 => Sequential()),
                 TimeStatusChange(:ON_ThermalStandard))
 
 #' Put the stages in a dict
@@ -114,10 +114,8 @@ stages = Dict(1 => DA_stage,
               2 => RT_stage)
 
 #' ### Build the simulation
-sim = Simulation("test", 1, stages, "/Users/cbarrows/Downloads/"; verbose = true, system_to_file = false, horizon=1)
+sim = Simulation("test", 1, stages, "~/Desktop/"; verbose = true, system_to_file = false, horizon=1)
 
 
 
 res = run_sim_model!(sim)
-
-
